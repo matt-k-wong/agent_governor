@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-governor"
+version = "0.1.0"
+description = "Jev-powered plan and code-change watchdog for coding agents"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Matthew Wong" }]
+requires-python = ">=3.10"
+dependencies = [
+    "typesafe-sdk>=0.6.0",
+    "keyring>=25",
+]
+
+[project.urls]
+Homepage = "https://github.com/matt-k-wong/agent_governor"
+Repository = "https://github.com/matt-k-wong/agent_governor"
+Issues = "https://github.com/matt-k-wong/agent_governor/issues"
+
+[project.scripts]
+agent-governor = "agent_governor:main"
+
+[tool.setuptools]
+py-modules = ["agent_governor"]
+packages = ["agent_governor_skill"]
+
+[tool.setuptools.package-data]
+agent_governor_skill = ["SKILL.md"]
