@@ -1,5 +1,7 @@
 # Coding agent integration
 
+> **Tip:** You can ask your agent to set this up automatically by pointing it at [`AGENTS.md`](../AGENTS.md): *"Read AGENTS.md and install/configure Agent Governor."*
+
 Install the Python CLI first (`python -m pip install .`), configure a TypeSafe or TrustedRouter key for Jev-backed commands, then run `agent-governor install-skill`. Restart the coding agent so it discovers the new skill.
 
 | Agent | User-wide skill directory installed by the command | Project skill directory |

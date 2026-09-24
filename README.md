@@ -2,7 +2,15 @@
 
 Agent Governor checks whether a coding agent's plan, proposed action, or Git diff stays aligned with a user's goal. It uses TypeSafe Jev for semantic judgments and local Python checks for known invalid commands, numbered-file collisions, and repository invariants.
 
-## Install
+## Fast Track: Let Your Agent Install It
+
+If you're pairing with an AI coding agent (Claude Code, Codex, Antigravity, Grok, Cursor, etc.), you can streamline setup by pointing your agent directly at [`AGENTS.md`](AGENTS.md):
+
+> *"Read AGENTS.md and install and configure Agent Governor for this workspace."*
+
+Your agent will inspect the environment, install the package, set up your preferred credentials (`TYPESAFE_API_KEY` or `TRUSTEDROUTER_API_KEY`), run `agent-governor install-skill` to register the cross-agent skill, and verify the CLI.
+
+## Manual Install
 
 Requires Python 3.10 or newer and credentials for TypeSafe Jev (`audit-plan`, `check`, and `audit-diff`). You can connect directly to TypeSafe or route requests through [TrustedRouter](https://trustedrouter.com/docs).
 
