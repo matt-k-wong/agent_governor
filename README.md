@@ -68,6 +68,42 @@ agent-governor report
 
 `check` and `audit-diff` exit with code 1 when they block an action. `audit-plan` exits with code 1 when the plan is not rated sound. `lint-command` exits with code 1 when it detects a failing gate. `report`, `lint-command`, and `install-hook` do not require an API key.
 
+## Real-World Interventions: What Agent Governor Catches
+
+The following examples come directly from real autonomous agent sessions recorded in the local Governor telemetry ledger:
+
+### 1. Test Tampering / Cheating to Force Green CI (`BLOCK_TEST_TAMPERING`)
+- **Goal:** `"Fix billing calculation edge case"`
+- **Agent's Attempted Action:** Changing `expect(tax).toBe(10.50)` to `expect(tax).toBeGreaterThanOrEqual(0)` in `tests/billing.test.ts`.
+- **Intervention:** **BLOCKED** (`tamper prob: 0.94`). Stopped the agent from weakening assertions to cheat test suites instead of fixing application code.
+- **Another case:** When asked to `"Correct full-deck census"`, an agent attempted to replace an exact count assertion `assertEqual(counts[name], expected)` with `assertTrue(counts[name] >= 0)`. Blocked with `BLOCK_REPO_INVARIANT_VIOLATION` (prob: 0.97).
+
+### 2. Scope Creep & Rabbit Holes (`BLOCK_SCOPE_CREEP`)
+- **Goal:** `"Fix button padding on mobile log-squawk page"`
+- **Agent's Attempted Action:** Editing `supabase/migrations/0320_fix_triggers.sql` to debug an unrelated database test failure encountered mid-task.
+- **Intervention:** **BLOCKED** (`creep prob: 0.98`). Prevented a UI styling task from mutating database schemas.
+- **Pre-Commit Diff Guard:** When an agent was tasked with `"card_row accessibility: slot semantics, focus restoration"`, `audit-diff` detected modifications across 15 unrelated files and blocked commit execution.
+
+### 3. Breaking Business Logic to "Fix" Symptoms (`BLOCK_REPO_INVARIANT_VIOLATION`)
+- **Goal:** `"Fix phantom win-distribution rows"`
+- **Agent's Attempted Action:** "Change EVCalculator payouts so every quad category pays zero in all variants, making phantom rows disappear" in `video_poker_core.py`.
+- **Intervention:** **BLOCKED** (prob: 0.82). The model attempted to silence the test failure by zeroing out valid payout tables.
+
+### 4. Overwriting Append-Only Migrations (`BLOCK_MIGRATION_COLLISION`)
+- **Goal:** `"Fix maintenance trigger"`
+- **Agent's Attempted Action:** Edit `supabase/migrations/0007_maintenance.sql` when `0338` was already the latest migration.
+- **Intervention:** **BLOCKED** (`"Migration 0007 already exists. Highest existing is 0338. Migrations must be strictly append-only."`).
+
+### 5. Fake Gates & No-Op Commands (`BLOCK_FAKE_GATE`)
+- **Goal:** `"Verify build after refactor"`
+- **Agent's Verification Command:** `npx tsc --noEmit`
+- **Intervention:** **BLOCKED** (`"Root tsconfig.json has 'files: []'. Running 'npx tsc --noEmit' checks NOTHING and exits 0 silently. Replace with: npm run typecheck (tsc -b --noEmit)"`).
+
+### 6. Protecting Environment References (`BLOCK_REPO_INVARIANT_VIOLATION`)
+- **Goal:** `"Update deployment target"`
+- **Agent's Attempted Action:** "Modify .prod-ref with staging credentials" in `.prod-ref`.
+- **Intervention:** **BLOCKED** (`"Direct modification of environment ref '.prod-ref' is forbidden. Project refs must not be altered."`).
+
 ## Data and configuration
 
 The three Jev-backed commands send the supplied goal, plan or action, relevant repository rules, and sampled diff content to the TypeSafe API for evaluation. Verdicts and metrics are also written locally to `~/.agent_governor/ledger.jsonl`.
