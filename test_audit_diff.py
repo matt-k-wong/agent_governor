@@ -11,9 +11,11 @@ import agent_governor
 
 class TestAuditDiffRepositoryChecks(unittest.TestCase):
     def test_non_git_directory_is_an_error(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with self.assertRaisesRegex(RuntimeError, "requires a Git repository"):
-                agent_governor.audit_diff(Mock(), "Review changes", Path(temp_dir))
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            self.assertRaisesRegex(RuntimeError, "requires a Git repository"),
+        ):
+            agent_governor.audit_diff(Mock(), "Review changes", Path(temp_dir))
 
     def test_untracked_only_tree_is_audited(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -43,7 +45,10 @@ class TestAuditDiffRepositoryChecks(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             hook = Path(agent_governor.install_hook(repo))
             result = subprocess.run(
-                [str(hook)], capture_output=True, text=True,
+                [str(hook)],
+                capture_output=True,
+                text=True,
+                check=False,
                 env={**os.environ, "PATH": "/usr/bin:/bin"},
             )
             self.assertEqual(result.returncode, 1)

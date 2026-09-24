@@ -14,6 +14,7 @@ class TestLintCommandExitStatus(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,
         )
         self.assertEqual(json.loads(result.stdout)["status"], "FAIL")
         self.assertEqual(result.returncode, 1, result.stderr)

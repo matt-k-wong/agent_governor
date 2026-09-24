@@ -439,25 +439,25 @@ def parse_diff_summary(diff_text: str) -> dict:
                     migration_violations.append(current_file)
 
             # Check for sensitive environment reference files
-            if any(current_file.endswith(s) for s in [".prod-ref", ".staging-ref", ".env.local"]):
-                if current_file not in sensitive_files:
-                    sensitive_files.append(current_file)
+            if (
+                any(current_file.endswith(s) for s in [".prod-ref", ".staging-ref", ".env.local"])
+                and current_file not in sensitive_files
+            ):
+                sensitive_files.append(current_file)
 
             # Check for test assertion modifications
             is_test_file = any(t in current_file.lower() for t in ["test.", "spec.", "tests/", "__tests__/"])
-            if is_test_file and line.startswith(("-", "+")):
-                if ASSERTION_KEYWORD_REGEX.search(line):
-                    assertion_changes.append({"file": current_file, "line": line})
-                    # Heuristic for test tampering: weakening or skipping
-                    if line.startswith("+") and any(w in line for w in [".skip", "xit(", "xtest(", "toBeGreaterThan", "toBeDefined", "toBeTruthy"]):
-                        tamper_suspect = True
-                    if line.startswith("-") and any(w in line for w in ["toBe(", "toEqual(", "assert "]):
-                        tamper_suspect = True
+            if is_test_file and line.startswith(("-", "+")) and ASSERTION_KEYWORD_REGEX.search(line):
+                assertion_changes.append({"file": current_file, "line": line})
+                # Heuristic for test tampering: weakening or skipping
+                if line.startswith("+") and any(w in line for w in [".skip", "xit(", "xtest(", "toBeGreaterThan", "toBeDefined", "toBeTruthy"]):
+                    tamper_suspect = True
+                if line.startswith("-") and any(w in line for w in ["toBe(", "toEqual(", "assert "]):
+                    tamper_suspect = True
 
             # Keep a sampled compact diff
-            if len(diff_lines_compact) < 150:
-                if line.startswith(("+", "-")) and not line.startswith(("+++", "---")):
-                    diff_lines_compact.append(f"{current_file}: {line[:120]}")
+            if len(diff_lines_compact) < 150 and line.startswith(("+", "-")) and not line.startswith(("+++", "---")):
+                diff_lines_compact.append(f"{current_file}: {line[:120]}")
 
     return {
         "files_modified": files_modified,
@@ -509,7 +509,7 @@ def get_repo_invariants(target_dir: Path | None = None) -> dict:
                 "protected_patterns": protected_patterns,
                 "repo_root": str(repo_root)
             }
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             sys.stderr.write(f"Warning: Failed to parse {gov_file}: {e}\n")
 
     # 2. Auto-parse CLAUDE.md if present
@@ -529,7 +529,7 @@ def get_repo_invariants(target_dir: Path | None = None) -> dict:
                     cleaned = re.sub(r"\[.*?\]|\(.*?\)|[*_`]", "", b).strip()
                     if len(cleaned) > 20:
                         invariants.append(cleaned[:160])
-        except Exception:
+        except OSError:
             pass
 
     return {
@@ -609,7 +609,7 @@ def lint_command(command_str: str, repo_dir: Path | None = None) -> dict:
     # Check for concurrent vitest process collision if running DB test
     if "test:db" in cmd_stripped or "vitest" in cmd_stripped:
         try:
-            ps_out = subprocess.run(["pgrep", "-f", "vitest"], capture_output=True, text=True).stdout.strip()
+            ps_out = subprocess.run(["pgrep", "-f", "vitest"], capture_output=True, text=True, check=False).stdout.strip()
             pids = ps_out.splitlines()
             if len(pids) > 1:
                 return {
@@ -619,7 +619,7 @@ def lint_command(command_str: str, repo_dir: Path | None = None) -> dict:
                     "replacement": "Wait for active vitest run to complete",
                     "rationale": f"Detected {len(pids)} active vitest processes. Concurrent runs reset the DB and destroy each other's state."
                 }
-        except Exception:
+        except OSError:
             pass
 
     return {"status": "PASS", "command": cmd_stripped}
@@ -852,7 +852,7 @@ def audit_diff(client, goal: str, target_dir: Path | None = None, staged_only: b
     """Evaluates entire git diff (staged or working tree) before commit or push."""
     repo_probe = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
-        cwd=target_dir or Path.cwd(), capture_output=True, text=True
+        cwd=target_dir or Path.cwd(), capture_output=True, text=True, check=False
     )
     if repo_probe.returncode != 0:
         raise RuntimeError("audit-diff requires a Git repository; run it there or pass --dir")
@@ -860,20 +860,20 @@ def audit_diff(client, goal: str, target_dir: Path | None = None, staged_only: b
 
     has_head = subprocess.run(
         ["git", "rev-parse", "--verify", "HEAD"],
-        cwd=repo_root, capture_output=True, text=True
+        cwd=repo_root, capture_output=True, text=True, check=False
     ).returncode == 0
     if staged_only:
         diff_cmd = ["git", "diff", "--staged"]
     else:
         diff_cmd = ["git", "diff", "HEAD"] if has_head else ["git", "diff"]
-    diff_proc = subprocess.run(diff_cmd, cwd=repo_root, capture_output=True, text=True)
+    diff_proc = subprocess.run(diff_cmd, cwd=repo_root, capture_output=True, text=True, check=False)
     if diff_proc.returncode != 0:
         raise RuntimeError(f"git diff failed: {diff_proc.stderr.strip()}")
     diff_text = diff_proc.stdout.strip()
 
     # If HEAD diff is empty and not staged, check plain working tree diff
     if not diff_text and not staged_only:
-        diff_proc2 = subprocess.run(["git", "diff"], cwd=repo_root, capture_output=True, text=True)
+        diff_proc2 = subprocess.run(["git", "diff"], cwd=repo_root, capture_output=True, text=True, check=False)
         if diff_proc2.returncode != 0:
             raise RuntimeError(f"git diff failed: {diff_proc2.stderr.strip()}")
         diff_text = diff_proc2.stdout.strip()
@@ -887,7 +887,7 @@ def audit_diff(client, goal: str, target_dir: Path | None = None, staged_only: b
     if not staged_only:
         untracked_proc = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard"],
-            cwd=repo_root, capture_output=True, text=True
+            cwd=repo_root, capture_output=True, text=True, check=False
         )
         if untracked_proc.returncode != 0:
             raise RuntimeError(f"git ls-files failed: {untracked_proc.stderr.strip()}")
@@ -909,9 +909,11 @@ def audit_diff(client, goal: str, target_dir: Path | None = None, staged_only: b
                     content = (repo_root / u).read_text(errors="ignore")
                 except OSError:
                     continue
-                if any(t in u.lower() for t in ["test.", "spec.", "tests/", "__tests__/"]):
-                    if ASSERTION_KEYWORD_REGEX.search(content):
-                        summary["assertion_changes"].append({"file": u, "line": "(untracked new test file)"})
+                if (
+                    any(t in u.lower() for t in ["test.", "spec.", "tests/", "__tests__/"])
+                    and ASSERTION_KEYWORD_REGEX.search(content)
+                ):
+                    summary["assertion_changes"].append({"file": u, "line": "(untracked new test file)"})
                 for line in content.splitlines()[:20]:
                     if len(sampled_lines) >= 100:
                         break
@@ -1100,7 +1102,7 @@ def log_telemetry(entry: dict):
         LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LEDGER_FILE, "a") as f:
             f.write(json.dumps(entry) + "\n")
-    except Exception as e:
+    except OSError as e:
         sys.stderr.write(f"Failed to log governor telemetry: {e}\n")
 
 
@@ -1186,7 +1188,7 @@ def main():
         try:
             installed = install_hook(target, args.type)
             print(f"✅ Successfully installed {args.type} hook at: {installed}")
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             print(f"❌ Failed to install hook: {e}", file=sys.stderr)
             sys.exit(1)
         return
@@ -1331,7 +1333,7 @@ def main():
                 if line.strip():
                     try:
                         entries.append(json.loads(line))
-                    except Exception:
+                    except (json.JSONDecodeError, OSError):
                         pass
 
         blocks = [e for e in entries if e.get("status", "").startswith("BLOCK")]

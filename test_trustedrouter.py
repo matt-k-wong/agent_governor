@@ -5,15 +5,18 @@ import unittest
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-import agent_governor
 from typesafe_sdk import Choice, Noul, Score
+
+import agent_governor
 
 
 class TestTrustedRouterIntegration(unittest.TestCase):
     def test_trustedrouter_env_key_takes_effect_when_typesafe_is_absent(self):
-        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "", "TRUSTEDROUTER_API_KEY": "sk-tr-test-key"}):
-            with patch.object(agent_governor.keyring, "get_password") as get_password:
-                client = agent_governor.get_decision_client()
+        with (
+            patch.dict(os.environ, {"TYPESAFE_API_KEY": "", "TRUSTEDROUTER_API_KEY": "sk-tr-test-key"}),
+            patch.object(agent_governor.keyring, "get_password") as get_password,
+        ):
+            client = agent_governor.get_decision_client()
         get_password.assert_not_called()
         self.assertIsInstance(client, agent_governor.TrustedRouterClient)
         self.assertEqual(client.api_key, "sk-tr-test-key")
@@ -24,9 +27,11 @@ class TestTrustedRouterIntegration(unittest.TestCase):
                 return "sk-tr-keyring-key"
             return None
 
-        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "", "TRUSTEDROUTER_API_KEY": ""}):
-            with patch.object(agent_governor.keyring, "get_password", side_effect=fake_get_password):
-                client = agent_governor.get_decision_client()
+        with (
+            patch.dict(os.environ, {"TYPESAFE_API_KEY": "", "TRUSTEDROUTER_API_KEY": ""}),
+            patch.object(agent_governor.keyring, "get_password", side_effect=fake_get_password),
+        ):
+            client = agent_governor.get_decision_client()
         self.assertIsInstance(client, agent_governor.TrustedRouterClient)
         self.assertEqual(client.api_key, "sk-tr-keyring-key")
 
@@ -37,10 +42,12 @@ class TestTrustedRouterIntegration(unittest.TestCase):
         self.assertEqual(client.api_key, "sk-tr-explicit")
 
     def test_explicit_provider_trustedrouter_missing_key(self):
-        with patch.dict(os.environ, {"TRUSTEDROUTER_API_KEY": ""}):
-            with patch.object(agent_governor.keyring, "get_password", return_value=None):
-                with self.assertRaisesRegex(RuntimeError, "No TrustedRouter API key found"):
-                    agent_governor.get_decision_client(provider="trustedrouter")
+        with (
+            patch.dict(os.environ, {"TRUSTEDROUTER_API_KEY": ""}),
+            patch.object(agent_governor.keyring, "get_password", return_value=None),
+            self.assertRaisesRegex(RuntimeError, "No TrustedRouter API key found"),
+        ):
+            agent_governor.get_decision_client(provider="trustedrouter")
 
     def test_invalid_provider_raises_value_error(self):
         with self.assertRaisesRegex(ValueError, "Unknown provider"):
@@ -53,25 +60,25 @@ class TestTrustedRouterIntegration(unittest.TestCase):
                 "alignment": {
                     "type": "choice",
                     "choice": "on_track",
-                    "probabilities": {"on_track": 0.95, "drift_rabbit_hole": 0.05}
+                    "probabilities": {"on_track": 0.95, "drift_rabbit_hole": 0.05},
                 },
                 "is_scope_creep": {
                     "type": "noul",
-                    "noul": 0.04
+                    "noul": 0.04,
                 },
                 "risk_severity": {
                     "type": "score",
                     "score": 0.25,
-                    "probabilities": {"0": 0.8, "1": 0.15, "2": 0.05}
-                }
+                    "probabilities": {"0": 0.8, "1": 0.15, "2": 0.05},
+                },
             },
             "usage": {"inputTokens": 300, "outputTokens": 40},
             "trustedrouter": {
                 "routing": {
                     "selected_model": "typesafe-ai/jev",
-                    "selected_provider": "typesafe"
-                }
-            }
+                    "selected_provider": "typesafe",
+                },
+            },
         }
 
         mock_resp = MagicMock()
@@ -86,7 +93,7 @@ class TestTrustedRouterIntegration(unittest.TestCase):
                     "alignment": Choice(instructions="Evaluate alignment", criteria={"on_track": "good"}),
                     "is_scope_creep": Noul(instructions="Is creep"),
                     "risk_severity": Score(instructions="Rate risk", criteria=["Low", "Med", "High"]),
-                }
+                },
             )
 
         mock_urlopen.assert_called_once()
@@ -114,30 +121,38 @@ class TestTrustedRouterIntegration(unittest.TestCase):
             code=401,
             msg="Unauthorized",
             hdrs={},
-            fp=io.BytesIO(b'{"error": "invalid api key"}')
+            fp=io.BytesIO(b'{"error": "invalid api key"}'),
         )
-        with patch("urllib.request.urlopen", side_effect=error):
-            with self.assertRaisesRegex(RuntimeError, "TrustedRouter request failed.*401.*invalid api key"):
-                client.system_one(state="test", questions={})
+        with (
+            patch("urllib.request.urlopen", side_effect=error),
+            self.assertRaisesRegex(RuntimeError, "TrustedRouter request failed.*401.*invalid api key"),
+        ):
+            client.system_one(state="test", questions={})
 
     def test_configure_key_trustedrouter_explicit(self):
-        with patch("getpass.getpass", return_value="sk-tr-configured-key"):
-            with patch.object(agent_governor.keyring, "set_password") as set_pw:
-                label = agent_governor.configure_key(provider="trustedrouter")
+        with (
+            patch("getpass.getpass", return_value="sk-tr-configured-key"),
+            patch.object(agent_governor.keyring, "set_password") as set_pw,
+        ):
+            label = agent_governor.configure_key(provider="trustedrouter")
         set_pw.assert_called_once_with("trustedrouter", "api-key", "sk-tr-configured-key")
         self.assertEqual(label, "TrustedRouter")
 
     def test_configure_key_auto_detects_sk_tr_prefix(self):
-        with patch("getpass.getpass", return_value="sk-tr-auto-detected"):
-            with patch.object(agent_governor.keyring, "set_password") as set_pw:
-                label = agent_governor.configure_key(provider="auto")
+        with (
+            patch("getpass.getpass", return_value="sk-tr-auto-detected"),
+            patch.object(agent_governor.keyring, "set_password") as set_pw,
+        ):
+            label = agent_governor.configure_key(provider="auto")
         set_pw.assert_called_once_with("trustedrouter", "api-key", "sk-tr-auto-detected")
         self.assertEqual(label, "TrustedRouter")
 
     def test_configure_key_auto_defaults_to_typesafe(self):
-        with patch("getpass.getpass", return_value="tsf_standard_key"):
-            with patch.object(agent_governor.keyring, "set_password") as set_pw:
-                label = agent_governor.configure_key(provider="auto")
+        with (
+            patch("getpass.getpass", return_value="tsf_standard_key"),
+            patch.object(agent_governor.keyring, "set_password") as set_pw,
+        ):
+            label = agent_governor.configure_key(provider="auto")
         set_pw.assert_called_once_with("typesafe-ai", "TYPESAFE_API_KEY", "tsf_standard_key")
         self.assertEqual(label, "TypeSafe")
 
